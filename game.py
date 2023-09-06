@@ -1,7 +1,7 @@
 import pygame
 import random 
-import decision_gen
 from pathlib import Path
+from decision_gen import Gen
 from decision_bin import Clasif
 
 pygame.init()
@@ -12,6 +12,7 @@ img_rose = path_assets / 'rose.png'
 
 SCREEN_HEIGHT = 600
 SCREEN_WIDTH = 1100
+VELOCIDAD = 16
 SCREEN = pygame.display.set_mode((SCREEN_WIDTH,SCREEN_HEIGHT))
 pygame.display.set_caption("Juego para entrenamiento de IA")
 clock = pygame.time.Clock()
@@ -23,7 +24,7 @@ class Player(pygame.sprite.Sprite):
         self.image.set_colorkey('black')
         self.rect = self.image.get_rect()
         self.rect.x = 80
-        self.rect.y = 330-self.rect.height
+        self.rect.y = 330 - self.rect.height
         self.jump = 10
         self.y = self.jump
            
@@ -34,16 +35,15 @@ class Obstaculos(pygame.sprite.Sprite):
         self.image.set_colorkey('black')
         self.rect = self.image.get_rect()
         self.rect.x = random.randrange(SCREEN_WIDTH,SCREEN_WIDTH+600)
-        self.rect.y = 330-self.rect.height
-        self.speed = 16
+        self.rect.y = 330 - self.rect.height
+        self.speed = VELOCIDAD
     
     def update(self):
         self.rect.x -= self.speed
         if self.rect.left < -self.rect.height-5:
             pos_x = random.randrange(SCREEN_WIDTH,SCREEN_WIDTH+(random.randrange(1,600)))
             self.rect.x = pos_x + abs(self.rect.x*random.randrange(pos_x//10))
-            
-    
+               
 all_sprites = pygame.sprite.Group()
 obstaculos_sprite = pygame.sprite.Group()
 
@@ -56,21 +56,19 @@ for i in range(4):
     all_sprites.add(obj)
     obstaculos_sprite.add(obj)
 
-global bef_score
 def main(nowPlayer=None, mode=None, algorithm="clasifier"):
     score = 0
     isJump = False
     run = True
     if not mode or mode!="normal":
         alg_clasify = algorithm =="clasifier"
-        if not mode and not alg_clasify:
-            now_player = nowPlayer if nowPlayer else decision_gen.gen()
-    
+        if not alg_clasify:
+            now_player = nowPlayer if nowPlayer else Gen(VELOCIDAD)
     while run:
         clock.tick(60)
         for event in pygame.event.get():
             if event == pygame.QUIT:
-                break
+                run = False
         
         for obj in obstaculos_sprite:
             salto = 0
@@ -81,7 +79,7 @@ def main(nowPlayer=None, mode=None, algorithm="clasifier"):
                 if alg_clasify: #utiliza algoritmo de clasificacion
                     salto = Clasif.play(dist)
                 elif not alg_clasify: #utiliza algoritmo genetico
-                    salto = dist-1 <= round(now_player, 2) <= dist+0.8
+                    salto = now_player.play(dist)
                 if salto:
                     isJump = True
 
@@ -89,12 +87,13 @@ def main(nowPlayer=None, mode=None, algorithm="clasifier"):
             if obstaculo.x in range(player.rect.x-24,player.rect.x):
                 score +=1
                 print(f"your score: {score}")
+        
         # saltos
         keystate = pygame.key.get_pressed()
         if mode and keystate[pygame.K_UP]:
             isJump=True
         if isJump:
-            if player.jump>=-10:
+            if player.jump >= -10:
                 player.rect.y -= (player.jump*abs(player.jump))*0.5
                 player.jump -=2
             else:
@@ -122,47 +121,50 @@ def main(nowPlayer=None, mode=None, algorithm="clasifier"):
         pygame.display.flip()
     pygame.quit()
 
-def runner(mode=None,alg="clasifier"):
-    if not mode and alg.lower() == "genetic":
-        player = decision_gen.gen()
-        generacion = 0
-        generations = decision_gen.generations
-        while True:
-            score = main(nowPlayer=player,algorithm="genetic")
+def run_genetico():
+    bef_score = None
+    generations:list[Gen] = []
 
-            print("-----Actual----")
-            print(f"player_gen:{round(player,2)}")
-            print(f"score:{score}")
-            print("------------------")
+    player = Gen(VELOCIDAD)
+    generations.append(player)
+    generacion = 0
 
-            bef_score = score if generacion == 0 else bef_score #juego anterior
-            fit_player = decision_gen.fitnes(score) #juego actual
-            print("fitness:", fit_player)
-    
-            if  fit_player <= bef_score or generacion < 2:# fit_player < 10: #si el actual es peor que el anterior
-                if len(generations) < 2: 
-                    generations.append([player, score])
-                    continue
-                else:    
-                    print("generando nuevo individuo")
-                    player = decision_gen.new_gen(generations[-2], generations[-1])
-                    generacion +=1
-                    bef_score = score
-            else:
-                print("----------retrocediendo......")
-                player = generations[-2][0]
-                bef_score = generations[-3][1]
+    while True:
+        score = main(nowPlayer=player,algorithm="genetic")
 
-            print("-------status the player------")
-            print(f"generacion: {generacion}")
-            print(f"fitnes:{fit_player}  player:{round(player,2)}")
+        print("-----Actual----")
+        print(f"player_gen: {player}")
+        print(f"score / fitness: {score}")
+        print("------------------")
 
-    elif not mode and alg=="clasifier":
-        main(algorithm="clasifier")
-    elif mode=="normal":
-        main(mode="normal")
+        bef_score = score if generacion == 0 else bef_score #juego anterior
+        player.score = score #juego actual
+
+        if  player.score <= bef_score and generacion > 2:# fit_player < 10: #si el actual es peor que el anterior
+            print("----------retrocediendo......")
+            print(generations)
+            player = generations[-2].mutar()
+            bef_score = generations[-3].score
+        else:
+            if len(generations) < 2: 
+                player = Gen(VELOCIDAD)
+            else:    
+                print("generando hijo")
+                player = player.hijo(generations[-2])
+            bef_score = score
+        generacion +=1
+        generations.append(player)
+
+        print("-------status the player------")
+        print(f"generacion: {generacion}")
+        print(f"fitnes: {player.score}  player: {player}")
+
+def runner(mode=None, alg="clasifier"):
+    if not mode and alg == "genetic":
+        run_genetico()
+    elif mode == "normal" or alg == "clasifier":
+        main(mode=mode, algorithm=alg)
     else: 
-        print("intoduzac un algoritmo valido")
-        return
+        print("intoduzca un algoritmo valido")
 
-runner(alg="clasifier")
+runner(alg="genetic")
