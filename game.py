@@ -142,7 +142,6 @@ def run_genetico():
 
         if  player.score <= bef_score and generacion > 2:# fit_player < 10: #si el actual es peor que el anterior
             print("----------retrocediendo......")
-            print(generations)
             player = generations[-2].mutar()
             bef_score = generations[-3].score
         else:
