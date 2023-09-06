@@ -19,9 +19,9 @@ def fitnes(score): #score-> actual
 
 def new_gen(parent,this): #generacion anteroir, generacion actual
     global generations
-    tolerances = [0.8,0.3,1]
+    tolerances = [0.8, 0.3]
     if parent[1] > this[1] and parent[0]<this[0]:#verificamos si el padre tuvo un mayor score y menor tiempo
-        time = parent[0]-random.choice(tolerances)
+        time = parent[0] - random.choice(tolerances)
     else:
         time = (this[0]/random.randrange(1,3))/(parent[0]-random.random())
     generations.append([abs(time),None])

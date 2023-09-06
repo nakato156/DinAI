@@ -1,8 +1,14 @@
 import pygame
 import random 
-from decision_bin import Clasif
 import decision_gen
+from pathlib import Path
+from decision_bin import Clasif
+
 pygame.init()
+
+path_assets = Path('./assets')
+img_player = path_assets / 'player.png'
+img_rose = path_assets / 'rose.png'
 
 SCREEN_HEIGHT = 600
 SCREEN_WIDTH = 1100
@@ -13,7 +19,7 @@ clock = pygame.time.Clock()
 class Player(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
-        self.image = pygame.image.load('../img/player2.png').convert()
+        self.image = pygame.image.load(img_player).convert()
         self.image.set_colorkey('black')
         self.rect = self.image.get_rect()
         self.rect.x = 80
@@ -24,7 +30,7 @@ class Player(pygame.sprite.Sprite):
 class Obstaculos(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
-        self.image = pygame.image.load('../img/rose.png').convert()
+        self.image = pygame.image.load(img_rose).convert()
         self.image.set_colorkey('black')
         self.rect = self.image.get_rect()
         self.rect.x = random.randrange(SCREEN_WIDTH,SCREEN_WIDTH+600)
@@ -51,20 +57,20 @@ for i in range(4):
     obstaculos_sprite.add(obj)
 
 global bef_score
-def main(nowPlayer=None,mode=None,algorithm="clasifier"):
+def main(nowPlayer=None, mode=None, algorithm="clasifier"):
     score = 0
     isJump = False
     run = True
     if not mode or mode!="normal":
-        alg_clasify = True if algorithm =="clasifier" else False
+        alg_clasify = algorithm =="clasifier"
         if not mode and not alg_clasify:
-            global bef_score
             now_player = nowPlayer if nowPlayer else decision_gen.gen()
+    
     while run:
         clock.tick(60)
         for event in pygame.event.get():
             if event == pygame.QUIT:
-                run = False
+                break
         
         for obj in obstaculos_sprite:
             salto = 0
@@ -75,8 +81,8 @@ def main(nowPlayer=None,mode=None,algorithm="clasifier"):
                 if alg_clasify: #utiliza algoritmo de clasificacion
                     salto = Clasif.play(dist)
                 elif not alg_clasify: #utiliza algoritmo genetico
-                    salto = 1 if dist-1<=round(now_player,2) <=dist+0.8 else 0 
-                if salto==1:
+                    salto = dist-1 <= round(now_player, 2) <= dist+0.8
+                if salto:
                     isJump = True
 
             #score
@@ -131,16 +137,15 @@ def runner(mode=None,alg="clasifier"):
 
             bef_score = score if generacion == 0 else bef_score #juego anterior
             fit_player = decision_gen.fitnes(score) #juego actual
-            print("fitness:",fit_player)
+            print("fitness:", fit_player)
     
             if  fit_player <= bef_score or generacion < 2:# fit_player < 10: #si el actual es peor que el anterior
                 if len(generations) < 2: 
-                    player = player
-                    generations.append([player,score])
+                    generations.append([player, score])
                     continue
                 else:    
                     print("generando nuevo individuo")
-                    player = decision_gen.new_gen(generations[-2],generations[-1])
+                    player = decision_gen.new_gen(generations[-2], generations[-1])
                     generacion +=1
                     bef_score = score
             else:
